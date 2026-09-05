@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using RoutineEscape.Application.Drafts;
+using RoutineEscape.Application.Interpretation;
 using RoutineEscape.Bot.Telegram;
 using RoutineEscape.Bot.Telegram.Handlers;
 using RoutineEscape.Bot.Telegram.Sources;
@@ -34,9 +35,27 @@ public sealed class TelegramUpdateDispatcherTests
         await dispatcher.DispatchAsync(MessageUpdate("Buy milk"), CancellationToken.None);
 
         var message = Assert.Single(gateway.Messages);
-        Assert.Equal("Как сохранить сообщение?", message.Text);
+        Assert.Equal("Не уверен, как лучше сохранить сообщение.", message.Text);
         Assert.NotNull(message.Buttons);
         Assert.Equal(5, message.Buttons.SelectMany(row => row).Count());
+    }
+
+    [Fact]
+    public async Task DispatchAsync_ShowsHighConfidenceAiSuggestionWithoutSaving()
+    {
+        var gateway = new RecordingGateway();
+        var interpretation = new MessageInterpretation(Intent.Event, 0.94m, "Собеседование",
+            null, "завтра", "16:00", "офис Kaspi", null);
+        var dispatcher = CreateDispatcher(gateway, new StubInterpreter(interpretation));
+
+        await dispatcher.DispatchAsync(MessageUpdate("Завтра собеседование"), CancellationToken.None);
+
+        var message = Assert.Single(gateway.Messages);
+        Assert.Contains("Похоже на событие", message.Text);
+        Assert.Contains("Собеседование", message.Text);
+        Assert.Contains("завтра, 16:00", message.Text);
+        Assert.Contains("Место: офис Kaspi", message.Text);
+        Assert.Equal(5, message.Buttons!.SelectMany(row => row).Count());
     }
 
     [Fact]
@@ -61,10 +80,14 @@ public sealed class TelegramUpdateDispatcherTests
         Assert.Equal("callback-1", Assert.Single(gateway.CallbackAnswers).Id);
     }
 
-    private static TelegramUpdateDispatcher CreateDispatcher(RecordingGateway gateway) => new(
+    private static TelegramUpdateDispatcher CreateDispatcher(
+        RecordingGateway gateway,
+        IMessageInterpreter? interpreter = null) => new(
         new StartCommandHandler(gateway),
         new TextMessageHandler(gateway, new TelegramMessageSourceExtractor(),
-            new MessageSourceDisplayFormatter(), new StubDraftFlowService(), TimeProvider.System),
+            new MessageSourceDisplayFormatter(), new StubDraftFlowService(),
+            interpreter ?? new StubInterpreter(null), TimeProvider.System,
+            NullLogger<TextMessageHandler>.Instance),
         new CallbackQueryHandler(gateway, new StubDraftFlowService(), TimeProvider.System),
         NullLogger<TelegramUpdateDispatcher>.Instance);
 
@@ -105,7 +128,13 @@ public sealed class TelegramUpdateDispatcherTests
     {
         public Task<DraftCreationResult> CreateAsync(CreateDraftRequest request,
             CancellationToken cancellationToken) =>
-            Task.FromResult(new DraftCreationResult(Guid.NewGuid(), request.CreatedAtUtc.AddHours(1)));
+            Task.FromResult(new DraftCreationResult(Guid.NewGuid(), request.CreatedAtUtc.AddHours(1),
+                request.Interpretation?.Intent ?? Intent.Unknown,
+                request.Interpretation?.Confidence ?? 0m,
+                request.Interpretation?.Title,
+                request.Interpretation?.DateExpression,
+                request.Interpretation?.TimeExpression,
+                request.Interpretation?.Location));
 
         public Task<DraftSelectionResult> SelectTypeAsync(Guid draftId, long telegramUserId,
             Intent intent, DateTimeOffset nowUtc, CancellationToken cancellationToken) =>
@@ -113,5 +142,13 @@ public sealed class TelegramUpdateDispatcherTests
 
         public Task CancelAsync(Guid draftId, long telegramUserId, CancellationToken cancellationToken) =>
             Task.CompletedTask;
+    }
+
+    private sealed class StubInterpreter(MessageInterpretation? result) : IMessageInterpreter
+    {
+        public Task<MessageInterpretation> InterpretAsync(string message, CancellationToken cancellationToken) =>
+            result is null
+                ? throw new InvalidOperationException("AI is not configured.")
+                : Task.FromResult(result);
     }
 }

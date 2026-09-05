@@ -33,12 +33,20 @@ public sealed class DraftFlowService(
 
         await sources.AddAsync(request.Source, cancellationToken);
         var expiresAt = request.CreatedAtUtc.Add(DraftLifetime);
-        var payload = JsonSerializer.Serialize(new DraftPayload(request.Text, request.Source.Id));
-        var draft = new Draft(Guid.NewGuid(), user.Id, request.TelegramMessageId, Intent.Unknown,
-            0m, payload, expiresAt, request.CreatedAtUtc);
+        var interpretation = request.Interpretation;
+        var intent = interpretation?.Intent ?? Intent.Unknown;
+        var confidence = interpretation?.Confidence ?? 0m;
+        var payload = JsonSerializer.Serialize(new DraftPayload(request.Text, request.Source.Id,
+            interpretation?.Title ?? request.Text, interpretation?.Description,
+            interpretation?.DateExpression, interpretation?.TimeExpression,
+            interpretation?.Location, interpretation?.Person));
+        var draft = new Draft(Guid.NewGuid(), user.Id, request.TelegramMessageId, intent,
+            confidence, payload, expiresAt, request.CreatedAtUtc);
         await drafts.AddAsync(draft, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new DraftCreationResult(draft.Id, expiresAt);
+        return new DraftCreationResult(draft.Id, expiresAt, intent, confidence,
+            interpretation?.Title, interpretation?.DateExpression, interpretation?.TimeExpression,
+            interpretation?.Location);
     }
 
     public async Task<DraftSelectionResult> SelectTypeAsync(Guid draftId, long telegramUserId,
@@ -95,25 +103,28 @@ public sealed class DraftFlowService(
         switch (intent)
         {
             case Intent.Task:
-                await tasks.AddAsync(new TaskItem(Guid.NewGuid(), userId, payload.Text, nowUtc,
-                    sourceId: payload.SourceId, originalText: payload.Text), cancellationToken);
+                await tasks.AddAsync(new TaskItem(Guid.NewGuid(), userId, payload.Title ?? payload.Text, nowUtc,
+                    description: payload.Description, sourceId: payload.SourceId,
+                    originalText: payload.Text), cancellationToken);
                 break;
             case Intent.Event:
-                await events.AddAsync(new CalendarEvent(Guid.NewGuid(), userId, payload.Text, nowUtc,
-                    nowUtc, sourceId: payload.SourceId), cancellationToken);
+                await events.AddAsync(new CalendarEvent(Guid.NewGuid(), userId, payload.Title ?? payload.Text, nowUtc,
+                    nowUtc, description: payload.Description, location: payload.Location,
+                    sourceId: payload.SourceId), cancellationToken);
                 break;
             case Intent.Reminder:
-                await reminders.AddAsync(new Reminder(Guid.NewGuid(), userId, payload.Text, nowUtc,
-                    nowUtc, sourceId: payload.SourceId), cancellationToken);
+                await reminders.AddAsync(new Reminder(Guid.NewGuid(), userId, payload.Title ?? payload.Text, nowUtc,
+                    nowUtc, description: payload.Description, sourceId: payload.SourceId), cancellationToken);
                 break;
             case Intent.Note:
                 await notes.AddAsync(new Note(Guid.NewGuid(), userId, payload.Text, nowUtc,
-                    sourceId: payload.SourceId), cancellationToken);
+                    title: payload.Title, sourceId: payload.SourceId), cancellationToken);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(intent));
         }
     }
 
-    private sealed record DraftPayload(string Text, Guid SourceId);
+    private sealed record DraftPayload(string Text, Guid SourceId, string? Title, string? Description,
+        string? DateExpression, string? TimeExpression, string? Location, string? Person);
 }

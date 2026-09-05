@@ -1,4 +1,5 @@
 using RoutineEscape.Domain.Entities;
+using RoutineEscape.Application.Interpretation;
 
 namespace RoutineEscape.Application.Drafts;
 
@@ -10,4 +11,5 @@ public sealed record CreateDraftRequest(
     long TelegramMessageId,
     string Text,
     MessageSource Source,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    MessageInterpretation? Interpretation = null);

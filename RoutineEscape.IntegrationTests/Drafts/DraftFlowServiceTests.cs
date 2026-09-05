@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RoutineEscape.Application.Drafts;
+using RoutineEscape.Application.Interpretation;
 using RoutineEscape.Domain.Entities;
 using RoutineEscape.Domain.Enums;
 using RoutineEscape.Infrastructure.Persistence;
@@ -43,6 +44,31 @@ public sealed class DraftFlowServiceTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.SelectTypeAsync(
             created.DraftId, 456, Intent.Note, Now.AddMinutes(1), CancellationToken.None));
         Assert.Empty(context.Notes);
+    }
+
+    [Fact]
+    public async Task CreateAndConfirmAiDraft_PersistsNormalizedFieldsOnlyAfterConfirmation()
+    {
+        await using var context = CreateContext();
+        var service = CreateService(context);
+        var source = MessageSource.Direct(Guid.NewGuid(), 123, Now);
+        var interpretation = new MessageInterpretation(Intent.Task, 0.91m,
+            "Отправить документы", "Диме", "до среды", "вечером", null, "Дима");
+
+        var created = await service.CreateAsync(new CreateDraftRequest(
+            123, "Ivan", null, null, 42, "Скинь Диме документы", source, Now, interpretation),
+            CancellationToken.None);
+
+        Assert.Empty(context.Tasks);
+        Assert.Equal(Intent.Task, created.SuggestedIntent);
+        Assert.Equal(0.91m, created.Confidence);
+        await service.SelectTypeAsync(created.DraftId, 123, Intent.Task,
+            Now.AddMinutes(1), CancellationToken.None);
+
+        var task = await context.Tasks.SingleAsync();
+        Assert.Equal("Отправить документы", task.Title);
+        Assert.Equal("Диме", task.Description);
+        Assert.Equal("Скинь Диме документы", task.OriginalText);
     }
 
     private static RoutineEscapeDbContext CreateContext()

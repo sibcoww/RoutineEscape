@@ -4,6 +4,8 @@ using RoutineEscape.Bot.Telegram.Handlers;
 using RoutineEscape.Bot.Telegram.Sources;
 using RoutineEscape.Application.Drafts;
 using RoutineEscape.Infrastructure.Persistence;
+using RoutineEscape.AI;
+using RoutineEscape.Application.Interpretation;
 using Telegram.Bot;
 using Telegram.Bot.AspNetCore;
 
@@ -34,6 +36,10 @@ builder.Services.AddScoped<TextMessageHandler>();
 builder.Services.AddScoped<CallbackQueryHandler>();
 builder.Services.AddScoped<ITelegramUpdateDispatcher, TelegramUpdateDispatcher>();
 builder.Services.AddScoped<IDraftFlowService, DraftFlowService>();
+var aiOptions = builder.Configuration.GetSection("AI").Get<OpenAiCompatibleOptions>() ?? new();
+builder.Services.AddSingleton(aiOptions);
+builder.Services.AddHttpClient<ILlmClient, OpenAiCompatibleLlmClient>();
+builder.Services.AddScoped<IMessageInterpreter, LlmMessageInterpreter>();
 builder.Services.AddHostedService<TelegramLongPollingService>();
 
 var connectionString = builder.Configuration.GetConnectionString("RoutineEscape");
