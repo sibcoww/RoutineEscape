@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: routineescape-postgres
+    environment:
+      POSTGRES_DB: routineescape
+      POSTGRES_USER: routineescape
+      POSTGRES_PASSWORD: routineescape_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - routineescape_pgdata:/var/lib/postgresql/data
+
+volumes:
+  routineescape_pgdata:
