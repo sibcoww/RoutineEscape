@@ -2,6 +2,7 @@ using System.Text.Json;
 using RoutineEscape.Application.Abstractions.Persistence;
 using RoutineEscape.Domain.Entities;
 using RoutineEscape.Domain.Enums;
+using RoutineEscape.Application.DateTimeResolution;
 
 namespace RoutineEscape.Application.Drafts;
 
@@ -13,6 +14,7 @@ public sealed class DraftFlowService(
     IRepository<CalendarEvent> events,
     IRepository<Reminder> reminders,
     IRepository<Note> notes,
+    IDateTimeResolver dateTimeResolver,
     IUnitOfWork unitOfWork) : IDraftFlowService
 {
     private static readonly TimeSpan DraftLifetime = TimeSpan.FromHours(1);
@@ -75,7 +77,7 @@ public sealed class DraftFlowService(
 
         var payload = JsonSerializer.Deserialize<DraftPayload>(draft.PayloadJson)
             ?? throw new InvalidOperationException("Draft payload is invalid.");
-        await AddEntityAsync(intent, user.Id, payload, nowUtc, cancellationToken);
+        await AddEntityAsync(intent, user, payload, nowUtc, cancellationToken);
         draft.Confirm(nowUtc);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return new DraftSelectionResult(intent, payload.Text);
@@ -97,27 +99,32 @@ public sealed class DraftFlowService(
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task AddEntityAsync(Intent intent, Guid userId, DraftPayload payload,
+    private async Task AddEntityAsync(Intent intent, AppUser user, DraftPayload payload,
         DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
+        DateTimeOffset? resolvedAt = payload.DateExpression is null && payload.TimeExpression is null
+            ? null
+            : dateTimeResolver.Resolve(payload.DateExpression, payload.TimeExpression,
+                nowUtc, user.TimeZoneId).Value.ToUniversalTime();
         switch (intent)
         {
             case Intent.Task:
-                await tasks.AddAsync(new TaskItem(Guid.NewGuid(), userId, payload.Title ?? payload.Text, nowUtc,
-                    description: payload.Description, sourceId: payload.SourceId,
+                await tasks.AddAsync(new TaskItem(Guid.NewGuid(), user.Id, payload.Title ?? payload.Text, nowUtc,
+                    description: payload.Description, deadlineUtc: resolvedAt, sourceId: payload.SourceId,
                     originalText: payload.Text), cancellationToken);
                 break;
             case Intent.Event:
-                await events.AddAsync(new CalendarEvent(Guid.NewGuid(), userId, payload.Title ?? payload.Text, nowUtc,
-                    nowUtc, description: payload.Description, location: payload.Location,
+                await events.AddAsync(new CalendarEvent(Guid.NewGuid(), user.Id, payload.Title ?? payload.Text,
+                    resolvedAt ?? nowUtc, nowUtc, description: payload.Description, location: payload.Location,
                     sourceId: payload.SourceId), cancellationToken);
                 break;
             case Intent.Reminder:
-                await reminders.AddAsync(new Reminder(Guid.NewGuid(), userId, payload.Title ?? payload.Text, nowUtc,
-                    nowUtc, description: payload.Description, sourceId: payload.SourceId), cancellationToken);
+                await reminders.AddAsync(new Reminder(Guid.NewGuid(), user.Id, payload.Title ?? payload.Text,
+                    resolvedAt ?? nowUtc, nowUtc, description: payload.Description,
+                    sourceId: payload.SourceId), cancellationToken);
                 break;
             case Intent.Note:
-                await notes.AddAsync(new Note(Guid.NewGuid(), userId, payload.Text, nowUtc,
+                await notes.AddAsync(new Note(Guid.NewGuid(), user.Id, payload.Text, nowUtc,
                     title: payload.Title, sourceId: payload.SourceId), cancellationToken);
                 break;
             default:

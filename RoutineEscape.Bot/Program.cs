@@ -6,6 +6,7 @@ using RoutineEscape.Application.Drafts;
 using RoutineEscape.Infrastructure.Persistence;
 using RoutineEscape.AI;
 using RoutineEscape.Application.Interpretation;
+using RoutineEscape.Application.DateTimeResolution;
 using Telegram.Bot;
 using Telegram.Bot.AspNetCore;
 
@@ -36,6 +37,7 @@ builder.Services.AddScoped<TextMessageHandler>();
 builder.Services.AddScoped<CallbackQueryHandler>();
 builder.Services.AddScoped<ITelegramUpdateDispatcher, TelegramUpdateDispatcher>();
 builder.Services.AddScoped<IDraftFlowService, DraftFlowService>();
+builder.Services.AddSingleton<IDateTimeResolver, RussianDateTimeResolver>();
 var aiOptions = builder.Configuration.GetSection("AI").Get<OpenAiCompatibleOptions>() ?? new();
 builder.Services.AddSingleton(aiOptions);
 builder.Services.AddHttpClient<ILlmClient, OpenAiCompatibleLlmClient>();

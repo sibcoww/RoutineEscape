@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RoutineEscape.Application.Drafts;
 using RoutineEscape.Application.Interpretation;
+using RoutineEscape.Application.DateTimeResolution;
 using RoutineEscape.Domain.Entities;
 using RoutineEscape.Domain.Enums;
 using RoutineEscape.Infrastructure.Persistence;
@@ -87,5 +88,6 @@ public sealed class DraftFlowServiceTests
         new EfRepository<CalendarEvent>(context),
         new EfRepository<Reminder>(context),
         new EfRepository<Note>(context),
+        new RussianDateTimeResolver(),
         context);
 }
