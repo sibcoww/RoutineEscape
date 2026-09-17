@@ -65,16 +65,14 @@ RoutineEscape — учебный Telegram-бот на C#/.NET для личны�
 | `RoutineEscape.Domain` | Предметная модель и бизнес-правила без внешних зависимостей |
 | `RoutineEscape.Application` | Сценарии приложения и абстракции портов |
 | `RoutineEscape.Infrastructure` | Хранилище и другие инфраструктурные адаптеры |
-| `RoutineEscape.AI` | Существующий необязательный LLM-адаптер вне актуального плана; не зарегистрирован в рабочем pipeline |
 | `RoutineEscape.Bot` | ASP.NET Core host и Telegram transport |
 | `RoutineEscape.UnitTests` | Быстрые модульные тесты Domain и Application |
 | `RoutineEscape.IntegrationTests` | Интеграционные тесты host и внешних адаптеров |
 
-Направление основных зависимостей:
+Основные слои работающего бота (распознавание выполняется локальными правилами):
 
 ```text
 Bot ──> Application ──> Domain
  │          ▲
- ├──> Infrastructure ──> Domain
- └──> AI ──────────────> Domain
+ └──> Infrastructure ──> Domain
 ```
