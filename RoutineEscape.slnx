@@ -1,5 +1,4 @@
 <Solution>
-  <Project Path="RoutineEscape.AI/RoutineEscape.AI.csproj" />
   <Project Path="RoutineEscape.Application/RoutineEscape.Application.csproj" />
   <Project Path="RoutineEscape.Bot/RoutineEscape.Bot.csproj" />
   <Project Path="RoutineEscape.Domain/RoutineEscape.Domain.csproj" />

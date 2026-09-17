@@ -62,9 +62,10 @@ builder.Services.AddHostedService<NotificationScheduler>();
 var connectionString = builder.Configuration.GetConnectionString("RoutineEscape");
 if (string.IsNullOrWhiteSpace(connectionString))
 {
-    connectionString = Environment.GetEnvironmentVariable("ROUTINEESCAPE_CONNECTION_STRING")
-        ?? "Host=localhost;Port=5432;Database=routineescape;Username=routineescape;Password=routineescape_dev";
+    connectionString = Environment.GetEnvironmentVariable("ROUTINEESCAPE_CONNECTION_STRING");
 }
+if (string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException("Database connection string is not configured.");
 builder.Services.AddRoutineEscapePersistence(connectionString);
 
 var app = builder.Build();

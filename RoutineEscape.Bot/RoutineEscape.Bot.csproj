@@ -21,7 +21,6 @@
   <ItemGroup>
     <ProjectReference Include="..\RoutineEscape.Application\RoutineEscape.Application.csproj" />
     <ProjectReference Include="..\RoutineEscape.Infrastructure\RoutineEscape.Infrastructure.csproj" />
-    <ProjectReference Include="..\RoutineEscape.AI\RoutineEscape.AI.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -22,7 +22,6 @@
   <ItemGroup>
     <ProjectReference Include="..\RoutineEscape.Bot\RoutineEscape.Bot.csproj" />
     <ProjectReference Include="..\RoutineEscape.Infrastructure\RoutineEscape.Infrastructure.csproj" />
-    <ProjectReference Include="..\RoutineEscape.AI\RoutineEscape.AI.csproj" />
   </ItemGroup>
 
 </Project>

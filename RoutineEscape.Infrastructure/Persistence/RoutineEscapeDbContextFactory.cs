@@ -7,8 +7,9 @@ public sealed class RoutineEscapeDbContextFactory : IDesignTimeDbContextFactory<
 {
     public RoutineEscapeDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable("ROUTINEESCAPE_CONNECTION_STRING")
-            ?? "Host=localhost;Port=5432;Database=routineescape;Username=routineescape;Password=routineescape_dev";
+        var connectionString = Environment.GetEnvironmentVariable("ROUTINEESCAPE_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("Set ROUTINEESCAPE_CONNECTION_STRING before running EF migrations.");
         var options = new DbContextOptionsBuilder<RoutineEscapeDbContext>()
             .UseNpgsql(connectionString)
             .Options;
