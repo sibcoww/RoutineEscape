@@ -1,6 +1,0 @@
-@RoutineEscape.Bot_HostAddress = http://localhost:5243
-
-GET {{RoutineEscape.Bot_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
