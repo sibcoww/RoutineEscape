@@ -1,0 +1,14 @@
+[Unit]
+Description=RoutineEscape PostgreSQL
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+ExecStart=/usr/bin/podman start --attach routineescape-db
+ExecStop=/usr/bin/podman stop --time 30 routineescape-db
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=RoutineEscape Telegram bot
+Wants=network-online.target
+Requires=routineescape-db.service
+After=network-online.target routineescape-db.service
+
+[Service]
+Restart=always
+RestartSec=10
+TimeoutStartSec=120
+ExecStart=/usr/bin/podman start --attach routineescape-bot
+ExecStop=/usr/bin/podman stop --time 30 routineescape-bot
+
+[Install]
+WantedBy=multi-user.target
