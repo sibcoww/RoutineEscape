@@ -42,4 +42,13 @@ public sealed class CalendarEvent : IEntity
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Rename(string title) => Title = DomainGuard.Required(title, nameof(title));
+    public void Reschedule(DateTimeOffset startUtc)
+    {
+        var start = DomainGuard.Utc(startUtc, nameof(startUtc));
+        var end = EndUtc is null ? (DateTimeOffset?)null : start.Add(EndUtc.Value - StartUtc);
+        StartUtc = start;
+        EndUtc = end;
+    }
 }

@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using RoutineEscape.Domain.Entities;
 using RoutineEscape.Infrastructure.Persistence;
+using RoutineEscape.Application.Records;
 
 namespace RoutineEscape.IntegrationTests.Persistence;
 
+[Collection("PostgreSQL")]
 public sealed class PostgreSqlPersistenceTests
 {
     [PostgreSqlFact]
@@ -11,6 +13,7 @@ public sealed class PostgreSqlPersistenceTests
     {
         var connectionString = Environment.GetEnvironmentVariable(
             PostgreSqlFactAttribute.ConnectionStringVariable)!;
+        PostgreSqlFactAttribute.RequireIsolatedDatabase(connectionString);
         var options = new DbContextOptionsBuilder<RoutineEscapeDbContext>()
             .UseNpgsql(connectionString)
             .Options;
@@ -29,6 +32,12 @@ public sealed class PostgreSqlPersistenceTests
 
         var storedTask = await context.Tasks.SingleAsync(candidate => candidate.Id == task.Id);
         Assert.Equal(user.Id, storedTask.UserId);
+        var browser = new RecordOverviewService(new EfRepository<AppUser>(context), new EfRepository<TaskItem>(context),
+            new EfRepository<CalendarEvent>(context), new EfRepository<Reminder>(context), new EfRepository<Note>(context));
+        Assert.Equal(task.Id, Assert.Single((await browser.BrowseAsync(user.TelegramUserId, RecordView.Search, "POSTGRESQL", 0, timestamp, default)).Items).Id);
+        task = storedTask; task.Complete(timestamp); await context.SaveChangesAsync();
+        Assert.Equal(task.Id, Assert.Single((await browser.BrowseAsync(user.TelegramUserId, RecordView.Completed, null, 0, timestamp, default)).Items).Id);
+        Assert.Empty((await browser.BrowseAsync(user.TelegramUserId, RecordView.Tasks, null, 0, timestamp, default)).Items);
         await transaction.RollbackAsync();
     }
 }

@@ -30,12 +30,14 @@ public sealed class TextMessageHandler(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(exception, "AI interpretation failed; using manual draft flow");
+            logger.LogWarning(exception, "Rule interpretation failed; using manual draft flow");
         }
 
         var draft = await draftFlowService.CreateAsync(new CreateDraftRequest(
             sender.Id, sender.FirstName, sender.LastName, sender.Username, message.Id,
             message.Text!, source, now, interpretation), cancellationToken);
+        logger.LogInformation("Recognized type={Intent} confidence={Confidence} draft={DraftId}",
+            draft.SuggestedIntent, draft.Confidence, draft.DraftId);
         var highConfidence = draft.SuggestedIntent != Intent.Unknown &&
                              draft.Confidence >= HighConfidenceThreshold;
         var response = highConfidence
@@ -53,7 +55,7 @@ public sealed class TextMessageHandler(
     {
         var lines = new List<string>
         {
-            $"{Icon(draft.SuggestedIntent)} Похоже на {DisplayName(draft.SuggestedIntent).ToLowerInvariant()}",
+            $"{Icon(draft.SuggestedIntent)} Похоже на {AccusativeName(draft.SuggestedIntent)}",
             string.Empty,
             draft.SuggestedTitle!,
         };
@@ -81,7 +83,7 @@ public sealed class TextMessageHandler(
             .ToArray();
         return
         [
-            [new BotButton($"✅ Добавить как {DisplayName(intent).ToLowerInvariant()}",
+            [new BotButton($"✅ Добавить как {AccusativeName(intent)}",
                 Data(intent.ToString(), draftId))],
             otherTypes,
             [new BotButton("❌ Отмена", $"draft:cancel:{draftId:N}")],
@@ -95,6 +97,13 @@ public sealed class TextMessageHandler(
         Intent.Reminder => "Напоминание",
         Intent.Note => "Заметка",
         _ => throw new ArgumentOutOfRangeException(nameof(intent)),
+    };
+
+    private static string AccusativeName(Intent intent) => intent switch
+    {
+        Intent.Task => "задачу", Intent.Event => "событие",
+        Intent.Reminder => "напоминание", Intent.Note => "заметку",
+        _ => "запись",
     };
 
     private static string Icon(Intent intent) => intent switch

@@ -77,10 +77,11 @@ public sealed class DraftFlowService(
 
         var payload = JsonSerializer.Deserialize<DraftPayload>(draft.PayloadJson)
             ?? throw new InvalidOperationException("Draft payload is invalid.");
-        await AddEntityAsync(intent, user, payload, nowUtc, cancellationToken);
+        var (entityId, atUtc) = await AddEntityAsync(intent, user, payload, draft.CreatedAt, nowUtc, cancellationToken);
         draft.Confirm(nowUtc);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new DraftSelectionResult(intent, payload.Text);
+        return new DraftSelectionResult(intent, payload.Title ?? payload.Text, entityId, atUtc,
+            payload.TimeExpression is not null || payload.DateExpression?.StartsWith("через ", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     public async Task CancelAsync(Guid draftId, long telegramUserId, CancellationToken cancellationToken)
@@ -99,37 +100,60 @@ public sealed class DraftFlowService(
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task AddEntityAsync(Intent intent, AppUser user, DraftPayload payload,
-        DateTimeOffset nowUtc, CancellationToken cancellationToken)
+    private async Task<(Guid Id, DateTimeOffset? AtUtc)> AddEntityAsync(Intent intent, AppUser user, DraftPayload payload,
+        DateTimeOffset referenceUtc, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
-        DateTimeOffset? resolvedAt = payload.DateExpression is null && payload.TimeExpression is null
-            ? null
-            : dateTimeResolver.Resolve(payload.DateExpression, payload.TimeExpression,
-                nowUtc, user.TimeZoneId).Value.ToUniversalTime();
+        DateTimeOffset? resolvedAt = null;
+        if (intent != Intent.Note)
+        {
+            var needsTime = intent is Intent.Event or Intent.Reminder;
+            var relative = payload.DateExpression?.StartsWith("через ", StringComparison.OrdinalIgnoreCase) == true;
+            if (needsTime && (payload.DateExpression is null || (!relative && payload.TimeExpression is null)))
+                throw new DraftDateValidationException("Нужны дата и время. Отправьте сообщение заново, например: «созвон завтра в 19:00».");
+            try
+            {
+                if (payload.DateExpression is not null || payload.TimeExpression is not null)
+                {
+                    var resolution = dateTimeResolver.Resolve(payload.DateExpression, payload.TimeExpression,
+                        referenceUtc, user.TimeZoneId);
+                    if (resolution.IsAmbiguous) throw new FormatException("Ambiguous local time.");
+                    resolvedAt = resolution.Value.ToUniversalTime();
+                    if (needsTime && resolvedAt <= nowUtc) throw new FormatException("Time has already passed.");
+                }
+            }
+            catch (Exception exception) when (exception is FormatException or ArgumentOutOfRangeException
+                or OverflowException or TimeZoneNotFoundException or InvalidTimeZoneException)
+            {
+                throw new DraftDateValidationException("Уточните дату и время, например: «23 сентября в 13:00». Число без месяца относится к текущему месяцу и должно быть в будущем.");
+            }
+        }
+        var entityId = Guid.NewGuid();
         switch (intent)
         {
             case Intent.Task:
-                await tasks.AddAsync(new TaskItem(Guid.NewGuid(), user.Id, payload.Title ?? payload.Text, nowUtc,
+                await tasks.AddAsync(new TaskItem(entityId, user.Id, payload.Title ?? payload.Text, nowUtc,
                     description: payload.Description, deadlineUtc: resolvedAt, sourceId: payload.SourceId,
-                    originalText: payload.Text), cancellationToken);
+                    originalText: payload.Text, hasExplicitTime: payload.TimeExpression is not null
+                        || payload.DateExpression?.StartsWith("через ", StringComparison.OrdinalIgnoreCase) == true), cancellationToken);
                 break;
             case Intent.Event:
-                await events.AddAsync(new CalendarEvent(Guid.NewGuid(), user.Id, payload.Title ?? payload.Text,
-                    resolvedAt ?? nowUtc, nowUtc, description: payload.Description, location: payload.Location,
+                await events.AddAsync(new CalendarEvent(entityId, user.Id, payload.Title ?? payload.Text,
+                    resolvedAt!.Value, nowUtc, description: payload.Description, location: payload.Location,
                     sourceId: payload.SourceId), cancellationToken);
                 break;
             case Intent.Reminder:
-                await reminders.AddAsync(new Reminder(Guid.NewGuid(), user.Id, payload.Title ?? payload.Text,
-                    resolvedAt ?? nowUtc, nowUtc, description: payload.Description,
+                await reminders.AddAsync(new Reminder(entityId, user.Id, payload.Title ?? payload.Text,
+                    resolvedAt!.Value, nowUtc, description: payload.Description,
                     sourceId: payload.SourceId), cancellationToken);
                 break;
             case Intent.Note:
-                await notes.AddAsync(new Note(Guid.NewGuid(), user.Id, payload.Text, nowUtc,
+                await notes.AddAsync(new Note(entityId, user.Id, payload.Text, nowUtc,
                     title: payload.Title, sourceId: payload.SourceId), cancellationToken);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(intent));
         }
+        return (entityId, resolvedAt);
     }
 
     private sealed record DraftPayload(string Text, Guid SourceId, string? Title, string? Description,

@@ -80,6 +80,20 @@ public sealed class TelegramUpdateDispatcherTests
         Assert.Equal("callback-1", Assert.Single(gateway.CallbackAnswers).Id);
     }
 
+    [Theory]
+    [InlineData("созвон завтра в 19:00")]
+    [InlineData("созвон завтра в девятнадцать ноль ноль")]
+    public async Task DispatchAsync_UsesRulesToOfferEventWithoutTypeSelection(string text)
+    {
+        var gateway = new RecordingGateway();
+        var dispatcher = CreateDispatcher(gateway, new RuleBasedMessageInterpreter());
+        await dispatcher.DispatchAsync(MessageUpdate(text), CancellationToken.None);
+        var message = Assert.Single(gateway.Messages);
+        Assert.Contains("Похоже на событие", message.Text);
+        Assert.Contains("завтра, в 19:00", message.Text);
+        Assert.Contains(message.Buttons!.SelectMany(row => row), button => button.Text == "✅ Добавить как событие");
+    }
+
     private static TelegramUpdateDispatcher CreateDispatcher(
         RecordingGateway gateway,
         IMessageInterpreter? interpreter = null) => new(
@@ -88,7 +102,7 @@ public sealed class TelegramUpdateDispatcherTests
             new MessageSourceDisplayFormatter(), new StubDraftFlowService(),
             interpreter ?? new StubInterpreter(null), TimeProvider.System,
             NullLogger<TextMessageHandler>.Instance),
-        new CallbackQueryHandler(gateway, new StubDraftFlowService(), TimeProvider.System),
+        new CallbackQueryHandler(gateway, new StubDraftFlowService(), TimeProvider.System, new EmptyRecordOverview()),
         NullLogger<TelegramUpdateDispatcher>.Instance);
 
     private static Update MessageUpdate(string text) => new()

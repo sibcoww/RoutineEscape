@@ -36,6 +36,7 @@ internal sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.Property(entity => entity.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(16);
         builder.Property(entity => entity.OriginalText).HasColumnName("original_text").HasMaxLength(8000);
         builder.Property(entity => entity.CompletedAt).HasColumnName("completed_at");
+        builder.Property(entity => entity.HasExplicitTime).HasColumnName("has_explicit_time");
         builder.HasIndex(entity => new { entity.UserId, entity.Status });
         builder.HasIndex(entity => entity.DeadlineUtc);
     }

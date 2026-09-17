@@ -59,4 +59,11 @@ public sealed class Reminder : IEntity
 
         Status = ReminderStatus.Cancelled;
     }
+
+    public void Rename(string title) => Title = DomainGuard.Required(title, nameof(title));
+    public void Reschedule(DateTimeOffset triggerAtUtc)
+    {
+        if (Status != ReminderStatus.Pending) throw new InvalidOperationException("Only active reminders can be rescheduled.");
+        TriggerAtUtc = DomainGuard.Utc(triggerAtUtc, nameof(triggerAtUtc));
+    }
 }

@@ -298,6 +298,68 @@ namespace RoutineEscape.Infrastructure.Persistence.Migrations
                     b.ToTable("notes", (string)null);
                 });
 
+            modelBuilder.Entity("RoutineEscape.Domain.Entities.NotificationSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActionToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("action_token");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<string>("Intent")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("intent");
+
+                    b.Property<DateTimeOffset?>("LastSentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_sent_at");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_id");
+
+                    b.Property<DateTimeOffset>("SourceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("source_at");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActionToken")
+                        .IsUnique();
+
+                    b.HasIndex("NextAttemptAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Intent", "RecordId")
+                        .IsUnique();
+
+                    b.ToTable("notification_schedules", (string)null);
+                });
+
             modelBuilder.Entity("RoutineEscape.Domain.Entities.Reminder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -375,6 +437,10 @@ namespace RoutineEscape.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("description");
 
+                    b.Property<bool>("HasExplicitTime")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_explicit_time");
+
                     b.Property<string>("OriginalText")
                         .HasMaxLength(8000)
                         .HasColumnType("character varying(8000)")
@@ -447,6 +513,15 @@ namespace RoutineEscape.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SourceId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("RoutineEscape.Domain.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoutineEscape.Domain.Entities.NotificationSchedule", b =>
+                {
                     b.HasOne("RoutineEscape.Domain.Entities.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
